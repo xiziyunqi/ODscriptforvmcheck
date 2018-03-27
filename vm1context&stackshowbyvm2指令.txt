@@ -1,0 +1,252 @@
+/*##############
+OD脚本实现单步调试vm1虚拟机
+显示vm1寄存器信息
+1.vm2对应的context地址：
+[4A8550]=eax
+[4A8554]=ebx
+[4A8558]=ecx
+[4A855c]=edx
+[4A8560]=esi
+[4A8564]=edi
+[4A8568]=esp
+[4A856c]=ebp
+2.刚开始栈顶值为0
+3.vm2的栈顶值放在[4a8568]。
+本脚本用于当栈顶变化时，显示vm2stack数据。
+本脚本用于执行完一条vm1的指令时(由翻译为字节码时，加入
+0,99,99,99,99字节码作为标签来判断)，显示vm2的上下文。
+另外：
+var middle4a8568
+var middle1
+var addralloc
+alloc 20
+mov addralloc,$RESULT
+mov middle,[4A8550],20
+//MSG [4A8550]不存在
+MSG middle
+mov addralloc,middle
+//[addralloc]不存在
+mov middle,addralloc
+cmp middle,middle1
+addralloc真是多此一举。
+num=num+1不存在
+############*/
+//《1》初始化变量
+var vm1instrunum
+var middle
+var numvm1
+var vmsz
+var vm2esp00 //vm2esp0栈底
+var vm2esp0 //vm2esp0栈顶
+var Vm2esp//value of [vm2esp]
+var vm2stacksz//vm2stacksz
+var dmavm2stackstart//dmavm2stackstart
+//《1》初始化变量
+var middle
+var vm2eax
+var vm2ebx
+var vm2ecx
+var vm2edx
+var vm2esi
+var vm2edi
+var vm2esp
+var vm2ebp
+var vm2eip
+var Vm2context
+mov vm2eax,[4A8550]
+mov vm2ebx,[4A8554]
+mov vm2ecx,[4A8558]
+mov vm2edx,[4A855c]
+mov vm2esi,[4A8560]
+mov vm2edi,[4A8564]
+mov vm2esp,[4A8568]
+mov vm2ebp,[4A856c]
+mov vm2eip,[4A8574]
+//alloc 20
+mov vm1instrunum,978.
+mov numvm1,0
+//mov addralloc,$RESULT
+mov middle,[4A8550],24
+//mov addralloc,middle
+
+//vm2stack的最初赋值
+jmp labelstart0//start
+labelstart0:
+sti
+//由源码中mov VMContext._esp, eax确定vm1栈顶在vm2中的位置。
+cmp 0,[4a8568]//check vm2esp
+jz labelstart0//yvm2esp 
+mov vm2esp00,[4a8568],4
+//MSG vm2esp00
+mov vm2esp0,[4a8568],4
+//jmp labelsto//栈顶赋初值后，进入记录vm2stack
+
+jmp labelstart
+/*执行sti，判断是否执行一条vm1指令：
+是则判断vm2寄存器是否修改：(否则直接继续sti判断，因为是以vm1一条指令为单位的)
+是则保存到文件并显示，然后返回到sti继续执行后判断，
+否则直接返回到sti继续执行后判断。*/
+labelstart:
+sti
+//#######该地址是从vm2code取vm2字节码，如果eip为该地址，说明执行完一个单位vm2指令了，
+//#######如果取到的新字节码是0x00（自己加入方便分析）,说明执行完一个vm1单位指令了
+cmp eip,43ce73//本脚本用于执行完一条vm1的指令时(edx+4),中间的vm2指令略过,判断条件有误，，导致后续分析低效
+jz labeltiaozhuan
+jmp labelstart
+
+labeltiaozhuan:
+cmp eax,0
+jz labelvm2stack
+jmp labelstart
+
+
+labelvm2stack://第一步处理vm2context
+mov numvm1,numvm1+1
+cmp numvm1,vm1instrunum
+jae labelchangedvm2context
+jmp gooncontextchecknoshow
+labelchangedvm2context:
+MSG "执行numvm1条vm1指令了"
+MSG numvm1
+jmp gooncontextcheckandshow
+gooncontextcheckandshow:
+mov middle1,[4A8550],24
+cmp middle,middle1
+//#不变化也添加到vm2context jz labelstart1
+//MSG "变化了"
+//MSG middle
+//MSG middle1
+mov middle,middle1//更新变化后的vm2context上下文值
+dma 4A8550,24,"G:\vmcontext.txt"
+wrta "G:\vmcontext.txt", "..........................."
+wrta "G:\vmcontext.txt", numvm1
+wrta "G:\vmcontext.txt", "..........................."
+wrta "G:\vmcontext.txt", numvm1
+mov Vm2context,[4A8550],24
+mov vm2eax,[4A8550]
+mov vm2ebx,[4A8554]
+mov vm2ecx,[4A8558]
+mov vm2edx,[4A855c]
+mov vm2esi,[4A8560]
+mov vm2edi,[4A8564]
+mov vm2esp,[4A8568]
+mov vm2ebp,[4A856c]
+//########numv1前不显示
+
+MSG "变化后的Vm2context(eabcdxesiebiespebp):"
+MSG Vm2context
+MSGYN "需要分别显示vm2reg？"
+cmp $RESULT,0
+jz labelstart1
+MSG "vm2eax:" 
+MSG vm2eax
+MSG "vm2ebx:" 
+MSG vm2ebx
+MSG "vm2ecx:" 
+MSG vm2ecx
+MSG "vm2edx:" 
+MSG vm2edx
+MSG "vm2esi:" 
+MSG vm2esi
+MSG "vm2edi:" 
+MSG vm2edi
+MSG "vm2esp:" 
+MSG vm2esp
+MSG "vm2ebp:" 
+MSG vm2ebp
+jmp labelstart1
+//########不显示仅仅赋值，保存值
+gooncontextchecknoshow:
+mov middle1,[4A8550],24
+cmp middle,middle1
+//#不变化也添加到vm2context jz labelstart1
+//MSG "变化了"
+//MSG middle
+//MSG middle1
+mov middle,middle1//更新变化后的vm2context上下文值
+dma 4A8550,24,"G:\vmcontext.txt"
+wrta "G:\vmcontext.txt", "..........................."
+wrta "G:\vmcontext.txt", numvm1
+wrta "G:\vmcontext.txt", "..........................."
+wrta "G:\vmcontext.txt", numvm1
+mov Vm2context,[4A8550],24
+mov vm2eax,[4A8550]
+mov vm2ebx,[4A8554]
+mov vm2ecx,[4A8558]
+mov vm2edx,[4A855c]
+mov vm2esi,[4A8560]
+mov vm2edi,[4A8564]
+mov vm2esp,[4A8568]
+mov vm2ebp,[4A856c]
+jmp labelstart1
+
+
+
+//2.3yvm2esp and wrt第二步处理vm2stack
+//labelcmp:
+labelstart1:
+mov middle4a8568,[4a8568]
+//#显示vm2_esp栈顶变化情况
+//MSG vm2esp0
+//MSG middle4a8568
+cmp vm2esp0,middle4a8568
+jz labelstart
+cmp vm2esp0,middle4a8568
+ja labelvmespa
+cmp vm2esp0,middle4a8568
+jb labelvmespb
+
+labelvmespa:
+mov dmavm2stackstart,[4a8568]
+//MSG dmavm2stackstart
+mov vm2stacksz,vm2esp0
+sub vm2stacksz,[4a8568]
+//########MSG "入栈："
+//MSG vm2stacksz
+dm [4a8568],vm2esp00-[4a8568],"G:\vmstack.txt"
+mov vmsz,vm2esp00-[4a8568]//显示vmstack内容
+mov Vm2esp,[dmavm2stackstart],vmsz
+//########numv1前不显示
+cmp numvm1,vm1instrunum
+
+jae labelVm2esp2
+jmp labelVm2esp12
+labelVm2esp2:
+MSG numvm1
+MSG Vm2esp
+jmp labelVm2esp12
+//########numv1前不显示
+//########MSG Vm2esp
+labelVm2esp12:
+mov vm2esp0,[4a8568]
+//MSGYN "继续？"
+jmp labelstart
+labelvmespb:
+mov vm2stacksz,[4a8568]
+//MSG vm2stacksz
+sub vm2stacksz,vm2esp0
+//########MSG "出栈："
+//MSG vm2stacksz
+dm [4a8568],vm2esp00-[4a8568],"G:\vmstack.txt"
+mov vmsz,vm2esp00-[4a8568]//显示vmstack内容
+mov vm2stacksz,[4a8568]
+mov Vm2esp,[vm2stacksz],vmsz
+//########numv1前不显示
+cmp numvm1,vm1instrunum
+
+jae labelVm2esp
+jmp labelVm2esp11
+labelVm2esp:
+MSG numvm1
+MSG Vm2esp
+jmp labelVm2esp1
+//########numv1前不显示
+//########MSG Vm2esp
+labelVm2esp1:
+mov vm2esp0,[4a8568]
+//MSGYN "继续？"
+jmp labelstart
+labelVm2esp11:
+mov vm2esp0,[4a8568]
+//########MSGYN "继续？"
+jmp labelstart
